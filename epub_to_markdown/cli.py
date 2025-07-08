@@ -51,9 +51,11 @@ def cli(ctx):
               help='Output directory for markdown files (default: output)')
 @click.option('--multiple-files', '-m', is_flag=True,
               help='Create multiple markdown files instead of a single file (one per chapter)')
+@click.option('--extract-images/--no-extract-images', '-i', default=True,
+              help='Extract and process images from EPUB (only available in multiple files mode)')
 @click.option('--verbose', '-v', is_flag=True,
               help='Enable verbose logging')
-def convert(epub_file: str, output_dir: str, multiple_files: bool, verbose: bool):
+def convert(epub_file: str, output_dir: str, multiple_files: bool, extract_images: bool, verbose: bool):
     """
     Convert EPUB files to markdown format.
     
@@ -71,10 +73,18 @@ def convert(epub_file: str, output_dir: str, multiple_files: bool, verbose: bool
         click.echo(f"📚 Converting EPUB file: {epub_file}")
         click.echo(f"📁 Output directory: {output_dir}")
         click.echo(f"📄 Output mode: {'Multiple files' if multiple_files else 'Single file'}")
+
+        # Check if user wants images in single file mode
+        if extract_images and not multiple_files:
+            click.echo(f"⚠️  Image extraction is only available in multiple files mode")
+            click.echo(f"🖼️  Extract images: No (disabled for single file mode)")
+        else:
+            click.echo(f"🖼️  Extract images: {'Yes' if extract_images and multiple_files else 'No'}")
         click.echo()
         
         # Initialize parser and converter
-        parser = EPUBParser(epub_file)
+        single_file_mode = not multiple_files
+        parser = EPUBParser(epub_file, extract_images=extract_images, output_dir=output_dir, single_file_mode=single_file_mode)
         converter = MarkdownConverter(output_dir)
         
         # Parse EPUB file
@@ -100,9 +110,20 @@ def convert(epub_file: str, output_dir: str, multiple_files: bool, verbose: bool
         
         if created_files:
             click.echo("✅ Conversion completed successfully!")
-            click.echo(f"📁 Created {len(created_files)} file(s):")
+
+            # Count images if available
+            total_images = sum(len(chapter.images) for chapter in chapters)
+
+            if total_images > 0:
+                click.echo(f"📁 Created {len(created_files)} file(s) and extracted {total_images} image(s):")
+            else:
+                click.echo(f"📁 Created {len(created_files)} file(s):")
+
             for file_path in created_files:
                 click.echo(f"   • {file_path}")
+
+            if total_images > 0:
+                click.echo(f"   • images/ directory with {total_images} processed image(s)")
         else:
             click.echo("❌ Conversion failed", err=True)
             sys.exit(1)
@@ -127,10 +148,12 @@ def convert(epub_file: str, output_dir: str, multiple_files: bool, verbose: bool
               help='Output directory for markdown files (default: output)')
 @click.option('--multiple-files', '-m', is_flag=True,
               help='Create multiple markdown files instead of a single file (one per chapter)')
+@click.option('--extract-images/--no-extract-images', '-i', default=True,
+              help='Extract and process images from EPUB (only available in multiple files mode)')
 @click.option('--verbose', '-v', is_flag=True,
               help='Enable verbose logging')
 @click.version_option(version='0.1.0', prog_name='epub-to-markdown')
-def main(epub_file: str, output_dir: str, multiple_files: bool, verbose: bool):
+def main(epub_file: str, output_dir: str, multiple_files: bool, extract_images: bool, verbose: bool):
     """
     Convert EPUB files to markdown format.
 
@@ -151,10 +174,18 @@ def main(epub_file: str, output_dir: str, multiple_files: bool, verbose: bool):
         click.echo(f"📚 Converting EPUB file: {epub_file}")
         click.echo(f"📁 Output directory: {output_dir}")
         click.echo(f"📄 Output mode: {'Multiple files' if multiple_files else 'Single file'}")
+
+        # Check if user wants images in single file mode
+        if extract_images and not multiple_files:
+            click.echo(f"⚠️  Image extraction is only available in multiple files mode")
+            click.echo(f"🖼️  Extract images: No (disabled for single file mode)")
+        else:
+            click.echo(f"🖼️  Extract images: {'Yes' if extract_images and multiple_files else 'No'}")
         click.echo()
 
         # Initialize parser and converter
-        parser = EPUBParser(epub_file)
+        single_file_mode = not multiple_files
+        parser = EPUBParser(epub_file, extract_images=extract_images, output_dir=output_dir, single_file_mode=single_file_mode)
         converter = MarkdownConverter(output_dir)
 
         # Parse EPUB file
@@ -180,9 +211,20 @@ def main(epub_file: str, output_dir: str, multiple_files: bool, verbose: bool):
 
         if created_files:
             click.echo("✅ Conversion completed successfully!")
-            click.echo(f"📁 Created {len(created_files)} file(s):")
+
+            # Count images if available
+            total_images = sum(len(chapter.images) for chapter in chapters)
+
+            if total_images > 0:
+                click.echo(f"📁 Created {len(created_files)} file(s) and extracted {total_images} image(s):")
+            else:
+                click.echo(f"📁 Created {len(created_files)} file(s):")
+
             for file_path in created_files:
                 click.echo(f"   • {file_path}")
+
+            if total_images > 0:
+                click.echo(f"   • images/ directory with {total_images} processed image(s)")
         else:
             click.echo("❌ Conversion failed", err=True)
             sys.exit(1)
@@ -263,7 +305,9 @@ def info(epub_file: str):
               help='Output directory for all converted files (default: batch_output)')
 @click.option('--multiple-files', '-m', is_flag=True,
               help='Create multiple markdown files for each EPUB (one per chapter)')
-def batch(directory: str, output_dir: str, multiple_files: bool):
+@click.option('--extract-images/--no-extract-images', '-i', default=True,
+              help='Extract and process images from EPUB files (only available in multiple files mode)')
+def batch(directory: str, output_dir: str, multiple_files: bool, extract_images: bool):
     """
     Convert all EPUB files in a directory to markdown format.
 
@@ -296,7 +340,8 @@ def batch(directory: str, output_dir: str, multiple_files: bool):
                 book_output_dir = os.path.join(output_dir, book_name)
 
                 # Initialize parser and converter
-                parser = EPUBParser(epub_file)
+                single_file_mode = not multiple_files
+                parser = EPUBParser(epub_file, extract_images=extract_images, output_dir=book_output_dir, single_file_mode=single_file_mode)
                 converter = MarkdownConverter(book_output_dir)
 
                 # Parse and convert

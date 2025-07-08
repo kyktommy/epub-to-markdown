@@ -35,9 +35,9 @@ def main():
         print(f"📚 Processing EPUB file: {epub_file}")
         print("=" * 50)
         
-        # Step 1: Parse the EPUB file
-        print("🔍 Parsing EPUB file...")
-        parser = EPUBParser(epub_file)
+        # Step 1: Parse the EPUB file (with image extraction in multiple files mode)
+        print("🔍 Parsing EPUB file and extracting images...")
+        parser = EPUBParser(epub_file, extract_images=True, output_dir="example_output", single_file_mode=False)
         metadata, chapters = parser.parse()
         
         # Step 2: Display book information
@@ -52,12 +52,20 @@ def main():
             print(f"  Description: {description}")
         
         print(f"\n📑 Found {len(chapters)} chapters:")
+        total_images = 0
         for i, chapter in enumerate(chapters[:5], 1):  # Show first 5 chapters
             word_count = len(chapter.content.split())
-            print(f"  {i}. {chapter.title} (~{word_count} words)")
-        
+            image_count = len(chapter.images)
+            total_images += image_count
+            print(f"  {i}. {chapter.title} (~{word_count} words, {image_count} images)")
+
         if len(chapters) > 5:
             print(f"  ... and {len(chapters) - 5} more chapters")
+            # Count images in remaining chapters
+            for chapter in chapters[5:]:
+                total_images += len(chapter.images)
+
+        print(f"\n🖼️  Total images extracted: {total_images}")
         
         # Step 3: Convert to markdown
         print(f"\n🔄 Converting to markdown...")
@@ -66,8 +74,8 @@ def main():
         output_dir = "example_output"
         converter = MarkdownConverter(output_dir)
         
-        # Convert (single file is now the default, set to False for multiple files)
-        single_file = True  # This is now the default
+        # Convert (using multiple files to enable image extraction)
+        single_file = False  # Use multiple files to enable image extraction
         created_files = converter.convert(metadata, chapters, single_file)
         
         # Step 4: Display results

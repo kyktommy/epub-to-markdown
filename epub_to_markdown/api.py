@@ -103,8 +103,8 @@ async def get_epub_info(file: UploadFile = File(...)):
             temp_file_path = temp_file.name
         
         try:
-            # Parse EPUB
-            parser = EPUBParser(temp_file_path)
+            # Parse EPUB (without image extraction for info endpoint)
+            parser = EPUBParser(temp_file_path, extract_images=False)
             metadata, chapters = parser.parse()
             
             return BookInfo(
@@ -130,14 +130,17 @@ async def get_epub_info(file: UploadFile = File(...)):
 async def convert_epub(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    single_file: bool = Form(True)
+    single_file: bool = Form(True),
+    extract_images: bool = Form(True)
 ):
     """
     Convert an EPUB file to markdown format.
 
     Output format is automatically determined:
-    - Single file mode: Returns individual file for download
-    - Multiple files mode: Returns ZIP archive
+    - Single file mode: Returns individual file for download (no image extraction)
+    - Multiple files mode: Returns ZIP archive (with optional image extraction)
+
+    Note: Image extraction is only available for EPUB files in multiple files mode.
     """
     if not file.filename.lower().endswith('.epub'):
         raise HTTPException(status_code=400, detail="File must be an EPUB file")
@@ -155,7 +158,7 @@ async def convert_epub(
         
         try:
             # Parse EPUB
-            parser = EPUBParser(epub_path)
+            parser = EPUBParser(epub_path, extract_images=extract_images, output_dir=output_dir, single_file_mode=single_file)
             metadata, chapters = parser.parse()
             
             if not chapters:
@@ -211,9 +214,20 @@ async def convert_epub(
                 zip_path = os.path.join(temp_dir, zip_filename)
 
                 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    # Add markdown files
                     for file_path in created_files:
                         arcname = os.path.basename(file_path)
                         zipf.write(file_path, arcname)
+
+                    # Add images directory if it exists
+                    images_dir = os.path.join(output_dir, "images")
+                    if os.path.exists(images_dir):
+                        for root, dirs, files in os.walk(images_dir):
+                            for file in files:
+                                file_path = os.path.join(root, file)
+                                # Create archive path relative to output_dir
+                                arcname = os.path.relpath(file_path, output_dir)
+                                zipf.write(file_path, arcname)
 
                 # Move ZIP to downloads directory
                 downloads_dir = "downloads"
@@ -224,9 +238,18 @@ async def convert_epub(
                 # Schedule cleanup
                 background_tasks.add_task(cleanup_temp_dir, temp_dir)
 
+                # Count total images
+                total_images = sum(len(chapter.images) for chapter in chapters)
+
+                # Create message based on content
+                if total_images > 0:
+                    message = f"Successfully converted EPUB to multiple markdown files with {total_images} images"
+                else:
+                    message = f"Successfully converted EPUB to multiple markdown files"
+
                 return ConversionResult(
                     success=True,
-                    message=f"Successfully converted EPUB to multiple markdown files",
+                    message=message,
                     book_info=book_info,
                     created_files=[os.path.basename(f) for f in created_files],
                     download_url=f"/download/{zip_filename}"

@@ -8,11 +8,13 @@ metadata, and structure for conversion to markdown format.
 import os
 import zipfile
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
 import logging
+
+from .image_extractor import ImageExtractor, EPUBImage
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +28,7 @@ class EPUBChapter:
     content: str
     file_name: str
     order: int
+    images: List[EPUBImage] = field(default_factory=list)
 
 
 @dataclass
@@ -45,22 +48,33 @@ class EPUBParser:
     A parser for EPUB files that extracts content, metadata, and structure.
     """
     
-    def __init__(self, epub_path: str):
+    def __init__(self, epub_path: str, extract_images: bool = True, output_dir: str = "output", single_file_mode: bool = True):
         """
         Initialize the EPUB parser.
-        
+
         Args:
             epub_path (str): Path to the EPUB file
+            extract_images (bool): Whether to extract and process images (only for multiple files mode)
+            output_dir (str): Output directory for processed images
+            single_file_mode (bool): Whether converting to single file (disables image extraction)
         """
         self.epub_path = epub_path
+        self.extract_images = extract_images and not single_file_mode  # Only extract in multiple files mode
+        self.output_dir = output_dir
+        self.single_file_mode = single_file_mode
         self.book = None
         self.metadata = None
         self.chapters = []
+        self.image_extractor = None
+
+        # Only create image extractor for EPUB files in multiple files mode
+        if self.extract_images and epub_path.lower().endswith('.epub'):
+            self.image_extractor = ImageExtractor(output_dir)
         
     def parse(self) -> Tuple[EPUBMetadata, List[EPUBChapter]]:
         """
         Parse the EPUB file and extract metadata and chapters.
-        
+
         Returns:
             Tuple[EPUBMetadata, List[EPUBChapter]]: Metadata and list of chapters
         """
@@ -68,15 +82,19 @@ class EPUBParser:
             # Read the EPUB file
             self.book = epub.read_epub(self.epub_path)
             logger.info(f"Successfully loaded EPUB: {self.epub_path}")
-            
+
             # Extract metadata
             self.metadata = self._extract_metadata()
-            
+
             # Extract chapters
             self.chapters = self._extract_chapters()
-            
+
+            # Extract images if enabled (only for EPUB files in multiple files mode)
+            if self.extract_images and self.image_extractor and not self.single_file_mode:
+                self._extract_and_process_images()
+
             return self.metadata, self.chapters
-            
+
         except Exception as e:
             logger.error(f"Error parsing EPUB file: {e}")
             raise
@@ -208,3 +226,35 @@ class EPUBParser:
         text = ' '.join(chunk for chunk in chunks if chunk)
         
         return text
+
+    def _extract_and_process_images(self):
+        """Extract and process images from the EPUB, associating them with chapters."""
+        try:
+            # Prepare chapter data for image extraction
+            chapters_data = []
+            for chapter in self.chapters:
+                # Get the original HTML content for image processing
+                for item in self.book.get_items():
+                    if item.get_type() == ebooklib.ITEM_DOCUMENT and item.get_name() == chapter.file_name:
+                        chapters_data.append({
+                            'title': chapter.title,
+                            'content': item.get_content().decode('utf-8'),
+                            'file_name': chapter.file_name
+                        })
+                        break
+
+            # Extract images using the image extractor
+            extracted_images = self.image_extractor.extract_images_from_epub(self.book, chapters_data)
+
+            # Associate images with chapters
+            for image in extracted_images:
+                # Find the chapter this image belongs to
+                chapter_index = image.page_number - 1  # page_number is 1-based
+                if 0 <= chapter_index < len(self.chapters):
+                    self.chapters[chapter_index].images.append(image)
+
+            logger.info(f"Associated {len(extracted_images)} images with chapters")
+
+        except Exception as e:
+            logger.error(f"Error extracting images: {e}")
+            # Don't fail the entire parsing process if image extraction fails

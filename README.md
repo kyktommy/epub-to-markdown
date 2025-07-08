@@ -12,6 +12,7 @@ If you find this project helpful, consider buying me a coffee! ☕
 
 - 📚 **Parse EPUB files** - Extract content, metadata, and structure from EPUB files
 - 📝 **Convert to Markdown** - Generate clean, properly formatted markdown files
+- 🖼️ **Image Extraction** - Extract, resize, and optimize images from EPUB files (multiple files mode only)
 - 🔧 **Multiple Interfaces** - Command line, REST API, and web UI
 - 🌐 **Web Interface** - User-friendly Streamlit web application
 - 🚀 **REST API** - FastAPI-based API for integration
@@ -43,6 +44,8 @@ pip install -r requirements.txt
 - streamlit >= 1.28.0
 - python-multipart >= 0.0.6
 - aiofiles >= 23.2.0
+- Pillow >= 10.0.0
+- mozjpeg-lossless-optimization >= 1.1.0
 
 ## Usage Options
 
@@ -64,11 +67,19 @@ python run_streamlit.py
 
 Then open your browser to: http://localhost:8501
 
+**Web Interface Options:**
+- **Output Format**: Choose between single file or multiple files
+- **Image Extraction**: Optional checkbox (disabled by default)
+  - When enabled: Always downloads as ZIP (even for single file mode)
+  - When disabled: Single file downloads as `.md`, multiple files as ZIP
+
 **Features:**
 - Drag & drop EPUB file upload
 - Real-time book information display
 - Chapter preview and analysis
-- Download converted files as ZIP
+- Output format selection (single file or multiple files)
+- Optional image extraction (disabled by default)
+- Smart download format: individual file or ZIP based on settings
 - User-friendly interface with progress indicators
 
 ### 2. REST API (FastAPI) - For Developers
@@ -142,6 +153,7 @@ epub-to-markdown api               # Launch FastAPI server
 |--------|-------|-------------|
 | `--output-dir` | `-o` | Output directory (default: output) |
 | `--multiple-files` | `-m` | Create multiple markdown files (one per chapter) |
+| `--extract-images/--no-extract-images` | `-i` | Extract and process images from EPUB (only available in multiple files mode) |
 | `--verbose` | `-v` | Enable verbose logging |
 
 **Web Interface Options:**
@@ -165,8 +177,13 @@ epub-to-markdown api               # Launch FastAPI server
 # Convert with custom settings (single file is now default)
 epub-to-markdown convert book.epub --output-dir /path/to/output
 
-# Convert to multiple files (one per chapter)
+# Convert to multiple files (one per chapter) with image extraction
 epub-to-markdown convert book.epub --multiple-files
+
+# Convert to multiple files without extracting images
+epub-to-markdown convert book.epub --multiple-files --no-extract-images
+
+# Note: Image extraction is only available in multiple files mode
 
 # Get book information only
 epub-to-markdown info book.epub
@@ -205,7 +222,7 @@ print(f"Created {len(created_files)} files")
 
 ```
 output/
-└── {book_title}.md                # All content in one file
+└── {book_title}.md                # All content in one file (no images)
 ```
 
 ### Multiple Files Mode
@@ -215,8 +232,78 @@ output/
 ├── {book_title}_index.md          # Main index with TOC
 ├── chapter_01_{chapter_title}.md  # Individual chapters
 ├── chapter_02_{chapter_title}.md
+├── images/                        # Extracted and processed images
+│   ├── img_001_cover.jpg
+│   ├── img_002_diagram.jpg
+│   └── ...
 └── ...
 ```
+
+**ZIP Archive Contents:**
+- All markdown files
+- Complete `images/` directory with all processed images
+- Maintains folder structure for easy extraction
+
+## Image Processing
+
+The tool automatically extracts and processes images from EPUB files in **multiple files mode only** with the following features:
+
+### Image Extraction Features
+- **EPUB Files Only** - Image extraction works only with EPUB format files
+- **Multiple Files Mode Only** - Images are only extracted when using `--multiple-files` option
+- **Automatic Detection** - Finds all images referenced in EPUB chapters
+- **Format Conversion** - Converts all images to optimized JPEG format
+- **Mozjpeg Compression** - Uses mozjpeg for superior compression quality
+- **Smart Resizing** - Resizes images to maximum 1920x1080 while maintaining aspect ratio
+- **Caption Extraction** - Automatically extracts captions from figcaption tags and context
+
+### Image Output
+- Images are saved in the `images/` subdirectory
+- **Smart Filename Format** (priority order):
+  1. **Caption-based**: `descriptive_caption.jpg` (if caption available)
+  2. **Page-based**: `page_001.jpg` (if page number available)
+  3. **Chapter-based**: `chapter_001.jpg` (fallback sequence)
+- **Conflict Resolution**: Duplicate names get `_01`, `_02` suffix
+- **Included in ZIP**: All images are automatically included in the ZIP archive for multiple files mode
+- Each image includes metadata overlay with:
+  - Caption (if available)
+  - Page/chapter number
+  - Chapter title
+  - Image dimensions and file size
+
+### Image Extraction Usage
+
+**CLI (Multiple Files Mode Only):**
+```bash
+# Enable image extraction (requires multiple files mode)
+epub-to-markdown convert book.epub --multiple-files
+
+# Disable image extraction in multiple files mode
+epub-to-markdown convert book.epub --multiple-files --no-extract-images
+
+# Single file mode (images not supported)
+epub-to-markdown convert book.epub  # No images extracted
+```
+
+**API:**
+```bash
+# Multiple files with images
+curl -X POST "http://localhost:8000/convert" \
+  -F "file=@book.epub" \
+  -F "single_file=false" \
+  -F "extract_images=true"
+
+# Multiple files without images
+curl -X POST "http://localhost:8000/convert" \
+  -F "file=@book.epub" \
+  -F "single_file=false" \
+  -F "extract_images=false"
+```
+
+**Web Interface:**
+- Use the "🖼️ Extract and process images" checkbox (disabled by default)
+- When enabled: Always downloads as ZIP (even for single file mode)
+- When disabled: Single file downloads as `.md`, multiple files as ZIP
 
 ## Web Interface Screenshots
 
@@ -270,7 +357,7 @@ output/
 ```json
 {
   "success": true,
-  "message": "Successfully converted EPUB to multiple markdown files",
+  "message": "Successfully converted EPUB to multiple markdown files with 5 images",
   "book_info": { ... },
   "created_files": [
     "The_Great_Gatsby_index.md",
@@ -280,6 +367,8 @@ output/
   "download_url": "/download/The_Great_Gatsby_markdown.zip"
 }
 ```
+
+**Note:** The ZIP archive includes both markdown files and the complete `images/` directory.
 
 ## Development
 
@@ -301,6 +390,7 @@ epub-to-markdown/
 │   ├── __init__.py
 │   ├── epub_parser.py      # Core EPUB parsing
 │   ├── markdown_converter.py  # Markdown conversion
+│   ├── image_extractor.py  # Image extraction and processing
 │   ├── cli.py             # Command line interface
 │   ├── api.py             # FastAPI REST API
 │   └── streamlit_app.py   # Streamlit web interface
@@ -319,34 +409,6 @@ All interfaces provide comprehensive error handling:
 - **Conversion failures** - Detailed error reporting
 - **Network issues** - Graceful handling of API timeouts
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test with all interfaces (CLI, API, Web)
-5. Submit a pull request
-
 ## License
 
 This project is licensed under the MIT License.
-
-## Changelog
-
-### v0.2.0
-- **BREAKING CHANGE**: Single file output is now the default (was multiple files)
-- **BREAKING CHANGE**: API output format is now automatic based on file mode:
-  - Single file mode: Returns individual file for direct download
-  - Multiple files mode: Returns ZIP archive only
-- Updated CLI: `--single-file` flag replaced with `--multiple-files` flag
-- Updated API: `single_file` parameter now defaults to `True`
-- Removed `output_format` parameter from API (now automatic)
-- Updated documentation to reflect new default behavior
-
-### v0.1.0
-- Initial release with CLI interface
-- Basic EPUB parsing and markdown conversion
-- FastAPI REST API
-- Streamlit web interface
-- Support for single file and multiple file output
-- Batch processing capability

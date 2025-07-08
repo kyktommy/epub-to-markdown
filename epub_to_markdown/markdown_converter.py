@@ -9,6 +9,7 @@ import os
 import re
 from typing import List, Optional
 from .epub_parser import EPUBMetadata, EPUBChapter
+from .image_extractor import EPUBImage
 import logging
 
 # Set up logging
@@ -224,6 +225,10 @@ class MarkdownConverter:
         # Format chapter content
         formatted_content = self._format_text_content(chapter.content)
         content += formatted_content
+
+        # Add images if present
+        if chapter.images:
+            content += self._format_chapter_images(chapter.images)
         
         # Add navigation at the end too
         if include_navigation and chapter_num:
@@ -293,6 +298,53 @@ class MarkdownConverter:
             filename = name[:200-len(ext)] + ext
         
         return filename
+
+    def _format_chapter_images(self, images: List[EPUBImage]) -> str:
+        """
+        Format images for inclusion in markdown.
+
+        Args:
+            images (List[EPUBImage]): List of images in the chapter
+
+        Returns:
+            str: Formatted markdown content for images
+        """
+        if not images:
+            return ""
+
+        content = "\n\n## Images\n\n"
+
+        for image in images:
+            # Create relative path to image
+            image_path = os.path.join("images", image.filename)
+
+            # Format image markdown
+            alt_text = image.alt_text or image.caption or f"Image {image.page_number}"
+            content += f"![{alt_text}]({image_path})\n\n"
+
+            # Add image details
+            if image.caption:
+                content += f"**Caption:** {image.caption}\n\n"
+
+            content += f"**Page:** {image.page_number}"
+            if image.chapter_title:
+                content += f" | **Chapter:** {image.chapter_title}"
+
+            content += f" | **Size:** {image.width}x{image.height}"
+            content += f" | **File Size:** {self._format_file_size(image.file_size)}\n\n"
+
+            content += "---\n\n"
+
+        return content
+
+    def _format_file_size(self, size_bytes: int) -> str:
+        """Format file size in human readable format."""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        else:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
     
     def _create_anchor(self, text: str) -> str:
         """
