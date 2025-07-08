@@ -47,8 +47,8 @@ def cli(ctx):
 
 @cli.command()
 @click.argument('epub_file', type=click.Path(exists=True, readable=True))
-@click.option('--output-dir', '-o', default='output',
-              help='Output directory for markdown files (default: output)')
+@click.option('--output-dir', '-o', default=None,
+              help='Output directory for markdown files (default: same directory as input file)')
 @click.option('--multiple-files', '-m', is_flag=True,
               help='Create multiple markdown files instead of a single file (one per chapter)')
 @click.option('--extract-images/--no-extract-images', '-i', default=True,
@@ -69,7 +69,13 @@ def convert(epub_file: str, output_dir: str, multiple_files: bool, extract_image
         if not epub_file.lower().endswith('.epub'):
             click.echo(f"Error: {epub_file} does not appear to be an EPUB file", err=True)
             sys.exit(1)
-        
+
+        # Set default output directory to input file's directory if not specified
+        if output_dir is None:
+            output_dir = os.path.dirname(os.path.abspath(epub_file))
+            if not output_dir:  # Handle case where file is in current directory
+                output_dir = '.'
+
         click.echo(f"📚 Converting EPUB file: {epub_file}")
         click.echo(f"📁 Output directory: {output_dir}")
         click.echo(f"📄 Output mode: {'Multiple files' if multiple_files else 'Single file'}")
@@ -144,8 +150,8 @@ def convert(epub_file: str, output_dir: str, multiple_files: bool, extract_image
 # Add a standalone main function for backward compatibility
 @click.command()
 @click.argument('epub_file', type=click.Path(exists=True, readable=True))
-@click.option('--output-dir', '-o', default='output',
-              help='Output directory for markdown files (default: output)')
+@click.option('--output-dir', '-o', default=None,
+              help='Output directory for markdown files (default: same directory as input file)')
 @click.option('--multiple-files', '-m', is_flag=True,
               help='Create multiple markdown files instead of a single file (one per chapter)')
 @click.option('--extract-images/--no-extract-images', '-i', default=True,
@@ -170,6 +176,12 @@ def main(epub_file: str, output_dir: str, multiple_files: bool, extract_images: 
         if not epub_file.lower().endswith('.epub'):
             click.echo(f"Error: {epub_file} does not appear to be an EPUB file", err=True)
             sys.exit(1)
+
+        # Set default output directory to input file's directory if not specified
+        if output_dir is None:
+            output_dir = os.path.dirname(os.path.abspath(epub_file))
+            if not output_dir:  # Handle case where file is in current directory
+                output_dir = '.'
 
         click.echo(f"📚 Converting EPUB file: {epub_file}")
         click.echo(f"📁 Output directory: {output_dir}")

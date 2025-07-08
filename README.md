@@ -151,7 +151,7 @@ epub-to-markdown api               # Launch FastAPI server
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--output-dir` | `-o` | Output directory (default: output) |
+| `--output-dir` | `-o` | Output directory (default: same directory as input file) |
 | `--multiple-files` | `-m` | Create multiple markdown files (one per chapter) |
 | `--extract-images/--no-extract-images` | `-i` | Extract and process images from EPUB (only available in multiple files mode) |
 | `--verbose` | `-v` | Enable verbose logging |
@@ -174,7 +174,10 @@ epub-to-markdown api               # Launch FastAPI server
 **Example Usage:**
 
 ```bash
-# Convert with custom settings (single file is now default)
+# Convert to same directory as input file (default behavior)
+epub-to-markdown convert book.epub
+
+# Convert with custom output directory
 epub-to-markdown convert book.epub --output-dir /path/to/output
 
 # Convert to multiple files (one per chapter) with image extraction
