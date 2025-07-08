@@ -37,6 +37,7 @@ def cli(ctx):
         click.echo("  batch      Convert multiple EPUB files")
         click.echo("  web        Launch Streamlit web interface")
         click.echo("  api        Launch FastAPI REST API server")
+        click.echo("  mcp        Launch MCP (Model Context Protocol) server")
         click.echo()
         click.echo("Use 'epub-to-markdown COMMAND --help' for more information")
         click.echo()
@@ -451,6 +452,37 @@ def api(port: int, host: str, reload: bool):
         sys.exit(1)
     except Exception as e:
         click.echo(f"❌ Error starting API server: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+def mcp():
+    """
+    Launch the MCP (Model Context Protocol) server.
+
+    This starts an MCP server that exposes EPUB to markdown conversion
+    tools for AI assistants and other applications.
+    """
+    try:
+        from .mcp_server import main as mcp_main
+
+        click.echo("🚀 Starting EPUB to Markdown MCP Server...")
+        click.echo("📡 MCP server is running and ready to accept connections")
+        click.echo("🔧 Available tool:")
+        click.echo("   - convert_epub_to_markdown: Convert EPUB to single markdown file")
+        click.echo("\nPress Ctrl+C to stop the server")
+
+        # Run the MCP server
+        mcp_main()
+
+    except ImportError:
+        click.echo("❌ Error: FastMCP library is not installed", err=True)
+        click.echo("Install it with: pip install fastmcp", err=True)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        click.echo("\n👋 MCP server stopped")
+    except Exception as e:
+        click.echo(f"❌ Error starting MCP server: {str(e)}", err=True)
         sys.exit(1)
 
 

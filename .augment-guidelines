@@ -5,6 +5,10 @@ You are an expert in Python, FastAPI, and scalable API development.
 - Do not modify README.md unless I tell you to
 - Changelog is not needed in README.md
 
+### Requirement
+
+- cli, api server, streamlit app, mcp support
+
 ### Python
 
 Key Principles

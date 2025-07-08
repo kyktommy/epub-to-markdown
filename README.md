@@ -13,9 +13,10 @@ If you find this project helpful, consider buying me a coffee! ☕
 - 📚 **Parse EPUB files** - Extract content, metadata, and structure from EPUB files
 - 📝 **Convert to Markdown** - Generate clean, properly formatted markdown files
 - 🖼️ **Image Extraction** - Extract, resize, and optimize images from EPUB files (multiple files mode only)
-- 🔧 **Multiple Interfaces** - Command line, REST API, and web UI
+- 🔧 **Multiple Interfaces** - Command line, REST API, web UI, and MCP server
 - 🌐 **Web Interface** - User-friendly Streamlit web application
 - 🚀 **REST API** - FastAPI-based API for integration
+- 🤖 **MCP Support** - Model Context Protocol server for AI assistant integration
 - 📊 **Batch Processing** - Convert multiple EPUB files at once
 - 📖 **Rich Metadata** - Preserve book information (title, author, publisher, etc.)
 - 🔍 **Chapter Analysis** - Extract and organize chapters with proper titles
@@ -46,6 +47,7 @@ pip install -r requirements.txt
 - aiofiles >= 23.2.0
 - Pillow >= 10.0.0
 - mozjpeg-lossless-optimization >= 1.1.0
+- fastmcp >= 0.1.0
 
 ## Usage Options
 
@@ -145,6 +147,7 @@ epub-to-markdown info book.epub     # Show book information
 epub-to-markdown batch directory/   # Batch convert directory
 epub-to-markdown web               # Launch Streamlit web interface
 epub-to-markdown api               # Launch FastAPI server
+epub-to-markdown mcp               # Launch MCP server for AI assistants
 ```
 
 **Convert Command Options:**
@@ -308,6 +311,43 @@ curl -X POST "http://localhost:8000/convert" \
 - When enabled: Always downloads as ZIP (even for single file mode)
 - When disabled: Single file downloads as `.md`, multiple files as ZIP
 
+### 5. MCP Server (Model Context Protocol) - For AI Assistants
+
+Start the MCP server using the CLI:
+
+```bash
+epub-to-markdown mcp
+# or
+python -m epub_to_markdown.cli mcp
+```
+
+Alternative using the standalone script:
+
+```bash
+python run_mcp.py
+```
+
+**MCP Server Features:**
+- **Protocol-based Interface**: Uses Model Context Protocol for AI assistant integration
+- **Single File Conversion**: Converts EPUB to single markdown file (text only, no images)
+- **Metadata Extraction**: Provides detailed EPUB file information
+- **Streaming Communication**: Uses stdio for real-time communication with AI assistants
+
+**Available MCP Tool:**
+
+| Tool | Description |
+|------|-------------|
+| `convert_epub_to_markdown` | Convert EPUB file to single markdown file (text only) |
+
+**Tool Parameters:**
+
+**convert_epub_to_markdown:**
+- `epub_path` (required): Path to the EPUB file
+- `output_dir` (optional): Output directory (defaults to same directory as input)
+
+**Example MCP Usage:**
+The MCP server is designed to be used by AI assistants and other applications that support the Model Context Protocol. When connected, AI assistants can use the tool to convert EPUB files to markdown format.
+
 ## Web Interface Screenshots
 
 ### Main Upload Interface
@@ -383,6 +423,9 @@ python run_api.py
 
 # Start Streamlit with auto-reload
 python run_streamlit.py
+
+# Start MCP server
+python run_mcp.py
 ```
 
 ### Project Structure
@@ -396,9 +439,11 @@ epub-to-markdown/
 │   ├── image_extractor.py  # Image extraction and processing
 │   ├── cli.py             # Command line interface
 │   ├── api.py             # FastAPI REST API
-│   └── streamlit_app.py   # Streamlit web interface
+│   ├── streamlit_app.py   # Streamlit web interface
+│   └── mcp_server.py      # MCP server for AI assistants
 ├── run_api.py             # API server launcher
 ├── run_streamlit.py       # Streamlit launcher
+├── run_mcp.py             # MCP server launcher
 ├── requirements.txt       # Dependencies
 └── README.md
 ```
