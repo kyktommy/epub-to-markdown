@@ -6,6 +6,7 @@ metadata, and structure for conversion to markdown format.
 """
 
 import os
+import re
 import zipfile
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
@@ -102,7 +103,7 @@ class EPUBParser:
     def _extract_metadata(self) -> EPUBMetadata:
         """
         Extract metadata from the EPUB book.
-        
+
         Returns:
             EPUBMetadata: Book metadata
         """
@@ -111,19 +112,22 @@ class EPUBParser:
             author = self.book.get_metadata('DC', 'creator')[0][0] if self.book.get_metadata('DC', 'creator') else "Unknown Author"
             language = self.book.get_metadata('DC', 'language')[0][0] if self.book.get_metadata('DC', 'language') else "en"
             identifier = self.book.get_metadata('DC', 'identifier')[0][0] if self.book.get_metadata('DC', 'identifier') else ""
-            
+
             publisher = None
             if self.book.get_metadata('DC', 'publisher'):
-                publisher = self.book.get_metadata('DC', 'publisher')[0][0]
-            
+                raw_publisher = self.book.get_metadata('DC', 'publisher')[0][0]
+                publisher = self._clean_metadata_text(raw_publisher)
+
             description = None
             if self.book.get_metadata('DC', 'description'):
-                description = self.book.get_metadata('DC', 'description')[0][0]
-            
+                raw_description = self.book.get_metadata('DC', 'description')[0][0]
+                description = self._clean_metadata_text(raw_description)
+
             rights = None
             if self.book.get_metadata('DC', 'rights'):
-                rights = self.book.get_metadata('DC', 'rights')[0][0]
-            
+                raw_rights = self.book.get_metadata('DC', 'rights')[0][0]
+                rights = self._clean_metadata_text(raw_rights)
+
             return EPUBMetadata(
                 title=title,
                 author=author,
@@ -133,7 +137,7 @@ class EPUBParser:
                 description=description,
                 rights=rights
             )
-            
+
         except Exception as e:
             logger.error(f"Error extracting metadata: {e}")
             return EPUBMetadata(
@@ -226,6 +230,49 @@ class EPUBParser:
         text = ' '.join(chunk for chunk in chunks if chunk)
         
         return text
+
+    def _clean_metadata_text(self, text: str) -> str:
+        """
+        Clean metadata text that may contain HTML tags and convert to plain text.
+
+        Args:
+            text (str): Raw metadata text that may contain HTML
+
+        Returns:
+            str: Cleaned plain text
+        """
+        if not text or not text.strip():
+            return text
+
+        # Check if the text contains HTML tags
+        if '<' in text and '>' in text:
+            try:
+                # Parse as HTML and extract text
+                soup = BeautifulSoup(text, 'html.parser')
+
+                # Remove script and style elements
+                for script in soup(["script", "style"]):
+                    script.decompose()
+
+                # Get text with separator to handle adjacent elements
+                cleaned_text = soup.get_text(separator=' ')
+
+                # Clean up whitespace and fix spacing around punctuation
+                lines = (line.strip() for line in cleaned_text.splitlines())
+                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                cleaned_text = ' '.join(chunk for chunk in chunks if chunk)
+
+                # Fix spacing around punctuation (remove space before punctuation)
+                cleaned_text = re.sub(r'\s+([.!?,:;])', r'\1', cleaned_text)
+
+                return cleaned_text
+            except Exception as e:
+                logger.warning(f"Error parsing HTML in metadata text: {e}")
+                # Fallback to original text if HTML parsing fails
+                return text.strip()
+
+        # If no HTML tags detected, just clean up whitespace
+        return text.strip()
 
     def _extract_and_process_images(self):
         """Extract and process images from the EPUB, associating them with chapters."""

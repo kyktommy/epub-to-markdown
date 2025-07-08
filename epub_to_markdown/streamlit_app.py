@@ -8,6 +8,7 @@ import os
 import tempfile
 import shutil
 import zipfile
+import time
 from io import BytesIO
 import streamlit as st
 from pathlib import Path
@@ -46,7 +47,7 @@ st.markdown("""
         display: none;
     }
     .stMainBlockContainer {
-        padding-top: 2rem;
+        padding-top: 1rem;
     }
     .stSidebar {
         padding-top: 2rem;
@@ -77,6 +78,12 @@ st.markdown("""
         border-radius: 0.5rem;
         border: 1px solid #f5c6cb;
     }
+    .loading-text {
+        color: #1f77b4;
+        font-weight: 500;
+        text-align: center;
+        padding: 0.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,9 +109,9 @@ def main():
 
         # Image extraction option
         extract_images = st.checkbox(
-            "🖼️ Extract and process images",
+            "🖼️ Extract images",
             value=False,
-            help="Extract images from EPUB, resize to max 1920x1080, and compress with mozjpeg. When enabled, output will be downloaded as ZIP."
+            help="Each image max 1920x1080 jpeg. Download as ZIP."
         )
 
         # Show download format info
@@ -122,10 +129,6 @@ def main():
     )
     
     if uploaded_file is not None:
-        # Display file information
-        st.markdown(f"**File:** {uploaded_file.name}")
-        st.markdown(f"**Size:** {uploaded_file.size:,} bytes")
-
         show_metadata, show_chapters, auto_download = True, True, True
 
         # Process the file
@@ -195,25 +198,54 @@ def display_book_metadata(metadata):
     
     if metadata.description:
         st.markdown("**Description:**")
-        st.markdown(f"_{metadata.description[:300]}{'...' if len(metadata.description) > 300 else ''}_")
+        st.markdown(f"_{metadata.description[:100]}{'...' if len(metadata.description) > 300 else ''}_")
 
 def display_chapters_info(chapters):
     """Display chapters information."""
-    
+
     st.header(f"📑 Chapters ({len(chapters)} found)")
-    
+
+    # Show loading spinner while processing chapter information
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
     # Create a dataframe for better display
     chapter_data = []
+    total_words = 0
+
     for i, chapter in enumerate(chapters, 1):
+        # Update progress
+        progress = i / len(chapters)
+        progress_bar.progress(progress)
+
+        # Truncate long titles for display
+        display_title = chapter.title[:40] + "..." if len(chapter.title) > 40 else chapter.title
+        status_text.text(f"📊 Analyzing chapter {i}/{len(chapters)}: {display_title}")
+
+        # Add small delay for better UX on very fast processing
+        if len(chapters) > 20:
+            time.sleep(0.01)  # Small delay only for very large books
+
         word_count = len(chapter.content.split())
+        total_words += word_count
         chapter_data.append({
             "Chapter": i,
             "Title": chapter.title,
-            "Words": f"{word_count:,}",
             "File": chapter.file_name
         })
-    
+
+    # Show completion message briefly
+    status_text.text(f"✅ Processed {len(chapters)} chapters")
+    time.sleep(0.5)  # Brief pause to show completion
+
+    # Clear progress indicators
+    progress_bar.empty()
+    status_text.empty()
+
     st.dataframe(chapter_data, use_container_width=True)
+
+    # Show completion message
+    st.success(f"📚 Successfully loaded {len(chapters)} chapters!")
 
 def convert_and_download(epub_path, metadata, chapters, single_file, extract_images, auto_download):
     """Convert EPUB to markdown and provide download."""
@@ -309,21 +341,6 @@ def convert_and_download(epub_path, metadata, chapters, single_file, extract_ima
         st.error(f"❌ Error during conversion: {str(e)}")
         logger.error(f"Error during conversion: {e}")
 
-# Header
-def show_header():
-    """Display header information."""
-    st.markdown(
-        """
-        <div style='text-align: center; color: #666;'>
-            <a href="https://coff.ee/kyktommy">
-                <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=flat-square&logo=buy-me-a-coffee" />
-            </a>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
 # Footer
 def show_footer():
     """Display footer information."""
@@ -333,12 +350,15 @@ def show_footer():
         <div style='text-align: center; color: #666; padding: 1rem;'>
             📚 EPUB to Markdown Converter | Built with Streamlit | 
             <a href='https://github.com/kyktommy/epub-to-markdown' target='_blank'>GitHub</a>
+            <br />
+            <a href="https://coff.ee/kyktommy">
+                <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=flat-square&logo=buy-me-a-coffee" />
+            </a>
         </div>
         """,
         unsafe_allow_html=True
     )
 
 if __name__ == "__main__":
-    show_header()
     main()
     show_footer()

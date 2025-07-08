@@ -75,9 +75,9 @@ Then open your browser to: http://localhost:8501
 
 **Features:**
 - Drag & drop EPUB file upload
-- Real-time book information display
-- Chapter preview and analysis
-- Output format selection (single file or multiple files)
+- Book information display
+- Chapter title preview
+- Output format options (single file or multiple files)
 - Optional image extraction (disabled by default)
 - Smart download format: individual file or ZIP based on settings
 - User-friendly interface with progress indicators
@@ -301,7 +301,7 @@ curl -X POST "http://localhost:8000/convert" \
 ```
 
 **Web Interface:**
-- Use the "🖼️ Extract and process images" checkbox (disabled by default)
+- Use the "🖼️ Extract images" checkbox (disabled by default)
 - When enabled: Always downloads as ZIP (even for single file mode)
 - When disabled: Single file downloads as `.md`, multiple files as ZIP
 
