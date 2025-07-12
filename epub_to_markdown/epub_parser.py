@@ -160,7 +160,8 @@ class EPUBParser:
         try:
             # Get all items in the book
             for item in self.book.get_items():
-                if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                # chapter is document or unknown
+                if item.get_type() == ebooklib.ITEM_DOCUMENT or item.get_type() == ebooklib.ITEM_UNKNOWN:
                     # Parse HTML content
                     soup = BeautifulSoup(item.get_content(), 'html.parser')
                     
@@ -169,6 +170,10 @@ class EPUBParser:
                     
                     # Clean and extract text content
                     content = self._clean_html_content(soup)
+
+                    if not title and content:
+                        # Skip empty chapter
+                        continue
                     
                     if content.strip():  # Only add chapters with content
                         chapter = EPUBChapter(

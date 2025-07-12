@@ -34,6 +34,7 @@ def cli(ctx):
         click.echo("Available commands:")
         click.echo("  convert    Convert EPUB file to markdown")
         click.echo("  info       Show EPUB file information")
+        click.echo("  chapters   List chapters in an EPUB file")
         click.echo("  batch      Convert multiple EPUB files")
         click.echo("  web        Launch Streamlit web interface")
         click.echo("  api        Launch FastAPI REST API server")
@@ -43,6 +44,7 @@ def cli(ctx):
         click.echo()
         click.echo("Quick start:")
         click.echo("  epub-to-markdown convert book.epub")
+        click.echo("  epub-to-markdown chapters book.epub")
         click.echo("  epub-to-markdown web")
 
 
@@ -260,23 +262,23 @@ def main(epub_file: str, output_dir: str, multiple_files: bool, extract_images: 
 def info(epub_file: str):
     """
     Display information about an EPUB file without converting it.
-    
+
     EPUB_FILE: Path to the EPUB file to analyze
     """
     try:
         if not epub_file.lower().endswith('.epub'):
             click.echo(f"Error: {epub_file} does not appear to be an EPUB file", err=True)
             sys.exit(1)
-        
+
         click.echo(f"📚 Analyzing EPUB file: {epub_file}")
         click.echo()
-        
+
         # Initialize parser
         parser = EPUBParser(epub_file)
-        
+
         # Parse EPUB file
         metadata, chapters = parser.parse()
-        
+
         # Display detailed information
         click.echo("📖 BOOK INFORMATION")
         click.echo("=" * 50)
@@ -284,29 +286,99 @@ def info(epub_file: str):
         click.echo(f"Author: {metadata.author}")
         click.echo(f"Language: {metadata.language}")
         click.echo(f"Identifier: {metadata.identifier}")
-        
+
         if metadata.publisher:
             click.echo(f"Publisher: {metadata.publisher}")
-        
+
         if metadata.description:
             click.echo(f"Description: {metadata.description[:200]}{'...' if len(metadata.description) > 200 else ''}")
-        
+
         if metadata.rights:
             click.echo(f"Rights: {metadata.rights}")
-        
+
         click.echo()
         click.echo("📑 CHAPTERS")
         click.echo("=" * 50)
         click.echo(f"Total chapters: {len(chapters)}")
         click.echo()
-        
+
         for i, chapter in enumerate(chapters, 1):
             word_count = len(chapter.content.split())
             click.echo(f"{i:2d}. {chapter.title}")
             click.echo(f"    File: {chapter.file_name}")
             click.echo(f"    Words: ~{word_count}")
             click.echo()
-            
+
+    except Exception as e:
+        click.echo(f"❌ Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument('epub_file', type=click.Path(exists=True, readable=True))
+@click.option('--format', '-f', type=click.Choice(['table', 'list']), default='table',
+              help='Output format: table (default) or list')
+def chapters(epub_file: str, format: str):
+    """
+    List chapters in an EPUB file in a clean, readable format.
+
+    EPUB_FILE: Path to the EPUB file to analyze
+    """
+    try:
+        if not epub_file.lower().endswith('.epub'):
+            click.echo(f"Error: {epub_file} does not appear to be an EPUB file", err=True)
+            sys.exit(1)
+
+        click.echo(f"📚 Listing chapters in: {epub_file}")
+        click.echo()
+
+        # Initialize parser (no image extraction needed)
+        parser = EPUBParser(epub_file, extract_images=False, single_file_mode=True)
+
+        # Parse EPUB file
+        metadata, chapters_list = parser.parse()
+
+        # Display book title and author
+        click.echo(f"📖 {metadata.title}")
+        if metadata.author != "Unknown Author":
+            click.echo(f"✍️  by {metadata.author}")
+        click.echo()
+
+        if not chapters_list:
+            click.echo("❌ No chapters found in this EPUB file")
+            return
+
+        click.echo(f"📑 Found {len(chapters_list)} chapters:")
+        click.echo()
+
+        if format == 'table':
+            # Table format
+            max_title_len = max(len(chapter.title) for chapter in chapters_list)
+            title_width = min(max(max_title_len, 20), 60)  # Cap at 60 chars
+
+            click.echo(f"{'#':<3} {'Title':<{title_width}} {'Words':<8}")
+            click.echo("-" * (3 + title_width + 8 + 2))
+
+            for i, chapter in enumerate(chapters_list, 1):
+                word_count = len(chapter.content.split()) if chapter.content else 0
+                display_title = chapter.title
+                if len(display_title) > title_width:
+                    display_title = display_title[:title_width-3] + "..."
+                click.echo(f"{i:<3} {display_title:<{title_width}} {word_count:<8}")
+
+        else:
+            # List format
+            for i, chapter in enumerate(chapters_list, 1):
+                word_count = len(chapter.content.split()) if chapter.content else 0
+                click.echo(f"{i:2d}. {chapter.title}")
+                click.echo(f"    Words: ~{word_count}")
+                click.echo()
+
+        # Summary
+        total_words = sum(len(chapter.content.split()) if chapter.content else 0 for chapter in chapters_list)
+        click.echo()
+        click.echo(f"📊 Total: {len(chapters_list)} chapters, ~{total_words:,} words")
+
     except Exception as e:
         click.echo(f"❌ Error: {str(e)}", err=True)
         sys.exit(1)
