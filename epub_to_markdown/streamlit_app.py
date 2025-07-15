@@ -129,54 +129,50 @@ def main():
     )
     
     if uploaded_file is not None:
-        show_metadata, show_chapters, auto_download = True, True, True
+        # Process the file immediately and convert to markdown
+        process_epub_file(uploaded_file, single_file, extract_images)
 
-        # Process the file
-        process_epub_file(uploaded_file, single_file, extract_images, show_metadata, show_chapters, auto_download)
+def process_epub_file(uploaded_file, single_file, extract_images):
+    """Process the uploaded EPUB file and automatically convert to markdown."""
 
-def process_epub_file(uploaded_file, single_file, extract_images, show_metadata, show_chapters, auto_download):
-    """Process the uploaded EPUB file."""
-    
+    temp_file_path = None
+
     try:
         # Create temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.epub') as temp_file:
             temp_file.write(uploaded_file.read())
             temp_file_path = temp_file.name
-        
-        # Parse EPUB
+
+        # Parse EPUB for metadata and chapters info
         with st.spinner("📖 Parsing EPUB file..."):
-            # Note: We'll re-parse with proper settings during conversion
             parser = EPUBParser(temp_file_path, extract_images=False)  # Just for metadata/preview
             metadata, chapters = parser.parse()
-        
+
         if not chapters:
             st.error("❌ No chapters found in the EPUB file")
             return
-        
+
+        # Automatically convert to markdown
+        st.header("🔄 Converting to Markdown...")
+        convert_and_download(temp_file_path, metadata, chapters, single_file, extract_images)
+
         # Display book information
-        if show_metadata:
-            display_book_metadata(metadata)
-        
-        # Display chapters information
-        if show_chapters:
+        display_book_metadata(metadata)
+
+        if st.button("🔍 Show Chapters"):
             display_chapters_info(chapters)
-        
-        # Conversion section
-        st.header("🔄 Convert to Markdown")
-        
-        if st.button("🚀 Convert to Markdown", type="primary", use_container_width=True):
-            convert_and_download(temp_file_path, metadata, chapters, single_file, extract_images, auto_download)
-        
+
     except Exception as e:
         st.error(f"❌ Error processing EPUB file: {str(e)}")
         logger.error(f"Error processing EPUB: {e}")
-    
+
     finally:
         # Clean up temporary file
-        try:
-            os.unlink(temp_file_path)
-        except:
-            pass
+        if temp_file_path:
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
 
 def display_book_metadata(metadata):
     """Display book metadata in a nice format."""
@@ -247,7 +243,7 @@ def display_chapters_info(chapters):
     # Show completion message
     st.success(f"📚 Successfully loaded {len(chapters)} chapters!")
 
-def convert_and_download(epub_path, metadata, chapters, single_file, extract_images, auto_download):
+def convert_and_download(epub_path, metadata, chapters, single_file, extract_images):
     """Convert EPUB to markdown and provide download."""
 
     try:
@@ -270,7 +266,7 @@ def convert_and_download(epub_path, metadata, chapters, single_file, extract_ima
                 with st.spinner("🔄 Converting to Markdown..."):
                     converter = MarkdownConverter(output_dir)
                     created_files = converter.convert(metadata, chapters, single_file)
-            
+
             if not created_files:
                 st.error("❌ Conversion failed - no files were created")
                 return
@@ -281,7 +277,10 @@ def convert_and_download(epub_path, metadata, chapters, single_file, extract_ima
                 st.success(f"✅ Successfully converted to {len(created_files)} Markdown file(s) and extracted {total_images} image(s)!")
             else:
                 st.success(f"✅ Successfully converted to {len(created_files)} Markdown file(s)!")
-            
+
+            # Show download section header
+            st.header("📥 Download Converted Files")
+
             # Create download options
             # Use ZIP download if images are extracted OR multiple files mode
             if extract_images or len(created_files) > 1:
@@ -302,7 +301,7 @@ def convert_and_download(epub_path, metadata, chapters, single_file, extract_ima
                                 # Create archive path relative to output_dir
                                 arcname = os.path.relpath(file_path, output_dir)
                                 zip_file.write(file_path, arcname)
-                
+
                 zip_buffer.seek(0)
                 zip_filename = f"{metadata.title.replace(' ', '_')}_markdown.zip"
 
@@ -336,7 +335,7 @@ def convert_and_download(epub_path, metadata, chapters, single_file, extract_ima
                     mime="text/markdown",
                     use_container_width=True
                 )
-    
+
     except Exception as e:
         st.error(f"❌ Error during conversion: {str(e)}")
         logger.error(f"Error during conversion: {e}")
